@@ -266,12 +266,9 @@ def process_csv(input_path, output_path):
 
     # Build output fieldnames
     extra_fields = ["gcs_total", "severity", "verbal_display"]
-    has_pupils = any("pupil" in row for row in rows for key, row in [(None, row)] if "pupil" in {k.lower() for k in row.keys()})
     # Check if any row has a 'pupils' column
     sample_keys = set(rows[0].keys()) if rows else set()
     has_pupils_col = any(k.lower() == "pupils" for k in sample_keys)
-    has_intubated_col = any(k.lower() == "intubated" for k in sample_keys)
-    has_pediatric_col = any(k.lower() == "pediatric" for k in sample_keys)
 
     if has_pupils_col:
         extra_fields.extend(["gcs_p", "prs_description"])
@@ -391,6 +388,67 @@ def build_parser():
         help="Output CSV file path",
     )
 
+    # --- audit subcommand ---
+    a = sub.add_parser(
+        "audit",
+        help="Run a distributed component audit task through the supervisor",
+    )
+    a.add_argument(
+        "--task-id", required=True,
+        help="Unique task identifier for the audit",
+    )
+    a.add_argument(
+        "--target", default="CLI-TARGET",
+        help="Target identifier for the audit",
+    )
+    a.add_argument(
+        "--primary", type=float, default=10.0,
+        help="Primary metric value",
+    )
+    a.add_argument(
+        "--secondary", type=float, default=5.0,
+        help="Secondary metric value",
+    )
+    a.add_argument(
+        "--status", default="NOMINAL",
+        help="Status descriptor (NOMINAL, DISCORDANT_ANOMALY, etc.)",
+    )
+    a.add_argument(
+        "--critical", action="store_true",
+        help="Flag as critical task",
+    )
+
+    # --- chat subcommand ---
+    c = sub.add_parser(
+        "chat",
+        help="Query the air-gapped supervisory assistant",
+    )
+    c.add_argument(
+        "query",
+        nargs="+",
+        help="Query text for the supervisory assistant",
+    )
+
+    # --- verify-audit subcommand ---
+    v = sub.add_parser(
+        "verify-audit",
+        help="Verify the HMAC-SHA256 audit trail integrity",
+    )
+
+    # --- serve subcommand ---
+    sv = sub.add_parser(
+        "serve",
+        help="Start the FastAPI REST server",
+    )
+    sv.add_argument(
+        "--host", default="0.0.0.0",
+        help="Host to bind the server to",
+    )
+    sv.add_argument(
+        "--port", type=int, default=8000,
+        help="Port to bind the server to",
+    )
+
     return p
 
 
@@ -450,6 +508,64 @@ def main(argv=None):
             print(f"Processed {len(results)} patients -> {a.output}")
         except FileNotFoundError:
             print(f"Error: Input file not found: {a.input}", file=sys.stderr)
+            return 1
+        except Exception as e:
+            print(f"Error: {e}", file=sys.stderr)
+            return 1
+        return 0
+
+    if a.cmd == "audit":
+        try:
+            from agents.supervisor import SystemSupervisor
+            from agents.models import SystemTaskPayload
+            supervisor = SystemSupervisor(model_provider="mock")
+            payload = SystemTaskPayload(
+                task_id=a.task_id,
+                target_identifier=a.target,
+                primary_metric=a.primary,
+                secondary_metric=a.secondary,
+                status_descriptor=a.status,
+                is_critical_flag=a.critical,
+            )
+            dossier = supervisor.process_task(payload)
+            print(json.dumps(dossier.to_dict(), indent=2, default=str))
+        except Exception as e:
+            print(f"Error: {e}", file=sys.stderr)
+            return 1
+        return 0
+
+    if a.cmd == "chat":
+        try:
+            from agents.supervisor import SystemSupervisor
+            supervisor = SystemSupervisor(model_provider="mock")
+            query = " ".join(a.query)
+            response = supervisor.query_supervisory_chat(query)
+            print(response)
+        except Exception as e:
+            print(f"Error: {e}", file=sys.stderr)
+            return 1
+        return 0
+
+    if a.cmd == "verify-audit":
+        try:
+            from agents.base import AuditLogger
+            verified = AuditLogger.verify_integrity()
+            trail = AuditLogger.get_trail()
+            print(f"Audit trail entries: {len(trail)}")
+            print(f"Integrity verified: {verified}")
+        except Exception as e:
+            print(f"Error: {e}", file=sys.stderr)
+            return 1
+        return 0
+
+    if a.cmd == "serve":
+        try:
+            import uvicorn
+            from agents.api import app
+            uvicorn.run(app, host=a.host, port=a.port)
+        except ImportError:
+            print("Error: uvicorn and fastapi are required for the server.", file=sys.stderr)
+            print("Install with: pip install fastapi uvicorn", file=sys.stderr)
             return 1
         except Exception as e:
             print(f"Error: {e}", file=sys.stderr)

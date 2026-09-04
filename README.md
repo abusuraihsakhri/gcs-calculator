@@ -1,6 +1,6 @@
 # GCS Calculator
 
-> **Domain:** Clinical Decision Support & Biomedical Computing  
+> **Domain:** Clinical Decision Support & Biomedical Computing
 > **Reference Guidelines & Standards:** `Standard Clinical Formulations & ISO/IEC Quality Frameworks`
 
 <div align="center">
@@ -27,8 +27,6 @@ Implements the standard GCS scoring system (Teasdale & Jennett, 1974) with:
 - Total GCS = E + V + M (range 3-15)
 - GCS-P (GCS-Pupil) score: GCS minus Pupil Reactivity Score
 - Pediatric verbal scale modifications
-
-Stdlib only. No external dependencies.
 
 ---
 
@@ -98,58 +96,89 @@ dict with keys:
 ## 📐 Mathematical Formulation & Logic
 
 ```text
-  """Calculate Glasgow Coma Scale score.
-  """Calculate GCS-P (GCS-Pupil) score.
-  result = calculate_gcs(
-  gcs_p = calculate_gcs_p(result["total"], pupils_val)
-  help="Calculate GCS for a single patient",
+Total GCS = Eye (E) + Verbal (V) + Motor (M)
+GCS Range: 3 (deep coma) to 15 (normal)
+
+GCS-P = GCS_total - Pupil Reactivity Score (PRS)
+GCS-P Range: 1 to 15
+
+Severity Classification:
+  15      : Normal
+  13-14   : Mild brain injury
+  9-12    : Moderate brain injury
+  3-8     : Severe brain injury (coma)
 ```
 
 ---
 
 ## 💻 CLI Quickstart & Usage
 
-### 1. Guided Interactive Mode
+### Installation
 ```bash
-python cli.py
+pip install -r requirements.txt
 ```
 
-### 2. Direct Parameterized Evaluation
+### 1. Score a Single Patient
 ```bash
-python cli.py --eye <value> --verbal <value> --motor <value> --pupils <value>
+python cli.py score --eye 4 --verbal 5 --motor 6
+python cli.py score --eye 3 --verbal 1T --motor 4 --pupils 1
+python cli.py score --eye 2 --verbal 2 --motor 3 --pediatric --json
+```
+
+### 2. Batch Process from CSV
+```bash
+python cli.py batch --input patients.csv --output scored.csv
+```
+
+### 3. Run Distributed Component Audit
+```bash
+python cli.py audit --task-id TASK-001 --primary 12.5 --secondary 4.0
+```
+
+### 4. Query Supervisory Assistant
+```bash
+python cli.py chat "Explain GCS scoring criteria"
+```
+
+### 5. Verify Audit Trail Integrity
+```bash
+python cli.py verify-audit
+```
+
+### 6. Start REST API Server
+```bash
+python cli.py serve --host 0.0.0.0 --port 8000
 ```
 
 ### Parameter Reference
-- `--eye`: Specifies input measurement or parameter value.
-- `--verbal`: Specifies input measurement or parameter value.
-- `--motor`: Specifies input measurement or parameter value.
-- `--pupils`: Specifies input measurement or parameter value.
-- `--pediatric`: Specifies input measurement or parameter value.
-- `--json`: Specifies input measurement or parameter value.
-- `--input`: Specifies input measurement or parameter value.
-- `--output`: Specifies input measurement or parameter value.
+- `--eye`: Eye Opening score (1-4)
+- `--verbal`: Verbal Response score (1-5 or 1T for intubated)
+- `--motor`: Motor Response score (1-6)
+- `--pupils`: Pupil Reactivity Score (0-2) for GCS-P
+- `--intubated`: Flag for intubated patients
+- `--pediatric`: Use pediatric verbal scale
+- `--json`: Output result as JSON
 
-### Input Data Schema
+### Input Data Schema (CSV)
 
 | Field | Description | Requirement |
 |:------|:------------|:------------|
-| `patient_id` | Parameter / observation metric | Required |
-| `eye` | Parameter / observation metric | Required |
-| `verbal` | Parameter / observation metric | Required |
-| `motor` | Parameter / observation metric | Required |
-| `pupils` | Parameter / observation metric | Required |
-| `intubated` | Parameter / observation metric | Required |
-| `pediatric` | Parameter / observation metric | Required |
+| `patient_id` | Patient identifier | Optional |
+| `eye` | Eye Opening score (1-4) | Required |
+| `verbal` | Verbal Response score (1-5 or 1T) | Required |
+| `motor` | Motor Response score (1-6) | Required |
+| `pupils` | Pupil Reactivity Score (0-2) | Optional |
+| `intubated` | Intubated flag (true/false) | Optional |
+| `pediatric` | Pediatric scale flag (true/false) | Optional |
 
 ---
 
 ## 🛡️ Security & Enterprise Architecture
 
-* **Zero-PHI Outbound Interceptor:** Active AST and regex inspection blocking SSNs, MRNs, phone numbers, and patient identifiers.
+* **Zero-PHI Outbound Interceptor:** Active regex inspection blocking SSNs, MRNs, phone numbers, and patient identifiers.
 * **Tamper-Evident HMAC-SHA256 Audit Trail:** Chained, cryptographically signed logs for every evaluation and state transition.
-* **Air-Gapped LLM Reasoning Adapter:** Agnostic integration for local Ollama instances (`llama3`, `mistral`), Claude 3.5 Sonnet, GPT-4o, and deterministic test mocks.
-* **Active Learning Bayesian Calibration:** Dynamic tracker updating worker reliability weights and monitoring Brier calibration drift.
 * **FastAPI & Prometheus Telemetry:** Exposes OpenAPI 3.1 REST endpoints and operational Prometheus metrics (`/metrics`).
+* **Multi-Agent Supervisory System:** Distributed component workers for QC, safety, and protocol conformance.
 
 ---
 
@@ -161,10 +190,17 @@ Run the automated test suite:
 pytest -v
 ```
 
+Run specific test files:
+
+```bash
+pytest test_gcs.py -v          # Core GCS functionality (102 tests)
+pytest tests/ -v               # Enterprise module tests
+```
+
 Execute high-throughput batch simulation benchmarks:
 
 ```bash
-python simulator.py --tasks 1000 --concurrency 8
+python simulator.py 1000
 ```
 
 ---
@@ -174,4 +210,36 @@ python simulator.py --tasks 1000 --concurrency 8
 ```bash
 docker build -t gcs-calculator .
 docker run -p 8000:8000 gcs-calculator
+```
+
+---
+
+## 📁 Project Structure
+
+```
+gcs-calculator/
+├── gcs.py                 # Core GCS calculator logic and CLI
+├── cli.py                 # CLI entry point
+├── test_gcs.py            # Core functionality tests
+├── enrichment.py          # Clinical enrichment engines
+├── simulator.py           # Simulation benchmark tool
+├── agents/                # Enterprise multi-agent module
+│   ├── api.py             # FastAPI REST server
+│   ├── base.py            # Security, PHI guard, audit trail
+│   ├── models.py          # Pydantic data models
+│   ├── supervisor.py      # Multi-agent orchestrator
+│   ├── workers.py         # Specialized worker agents
+│   ├── llm_factory.py     # LLM provider factory
+│   ├── metrics.py         # Prometheus metrics exporter
+│   ├── streamer.py        # WebSocket telemetry streamer
+│   └── learning.py        # Bayesian calibration engine
+├── tests/                 # Enterprise module tests
+│   ├── test_gcs_calculator.py
+│   └── test_enrichment.py
+├── web/                   # Operations console (HTML)
+├── sample.csv             # Sample patient data
+├── benchmark_dataset.json # Benchmark test cases
+├── Dockerfile             # Container definition
+├── docker-compose.yml     # Docker Compose configuration
+└── requirements.txt       # Python dependencies
 ```
