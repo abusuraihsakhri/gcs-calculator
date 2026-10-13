@@ -1,14 +1,11 @@
-version: '3.8'
-
 services:
   gcs-calculator:
     build: .
     container_name: gcs-calculator
     ports:
-      - "8000:8000"
+      - "127.0.0.1:8000:8000"
     environment:
-      - AUDIT_SECRET_KEY=gcs-calculator-prod-audit-key-2026
-      - MODEL_PROVIDER=mock
+      AUDIT_SECRET_KEY: ${AUDIT_SECRET_KEY:?Set AUDIT_SECRET_KEY before starting the container}
     restart: unless-stopped
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
