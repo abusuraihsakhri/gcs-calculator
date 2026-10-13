@@ -1,245 +1,59 @@
-# GCS Calculator
+# Glasgow Coma Scale (GCS) Calculator
 
-> **Domain:** Clinical Decision Support & Biomedical Computing
-> **Reference Guidelines & Standards:** `Standard Clinical Formulations & ISO/IEC Quality Frameworks`
+A Glasgow Coma Scale scoring tool with a standalone browser interface, Python CLI, CSV processing, optional pupil reactivity scoring (GCS-P), and a FastAPI backend.
 
-<div align="center">
+## Use the calculator
 
-[![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
-![Python](https://img.shields.io/badge/Python-3.10%20%7C%203.11%20%7C%203.12-3776AB.svg?logo=python&logoColor=white)
-![FastAPI](https://img.shields.io/badge/FastAPI-0.111-009688.svg?logo=fastapi&logoColor=white)
-![Audit Trail](https://img.shields.io/badge/Audit-HMAC--SHA256_Tamper--Evident-brightgreen.svg)
-![Zero-PHI Guard](https://img.shields.io/badge/Guard-Zero--PHI_Outbound-blue.svg)
-![Docker](https://img.shields.io/badge/Docker-Ready-2496ED.svg?logo=docker&logoColor=white)
+Open `web/index.html` in a browser. The primary calculator works without a server, account, build step, external dependencies or network access. Select the eye (E), verbal (V), and motor (M) responses; the total (3–15) updates immediately. You can optionally enter pupil reactivity (PRS: 0–2) to obtain GCS-P, or choose preverbal pediatric verbal descriptions.
 
-</div>
+**Important:** If the verbal response cannot be assessed, including because of intubation, mark it **NT (not testable)**. In that case neither a total GCS nor GCS-P is reported; only the assessable components are displayed. The legacy CLI input `1T` is still accepted but now means V-NT, not a numeric V1.
 
----
+The TBI severity bands are **mild: 13–15**, **moderate: 9–12**, **severe: 3–8**. These describe the score range in traumatic brain injury and do not independently establish a diagnosis, prognosis or management plan. GCS 15 alone does not establish that a person is neurologically normal.
 
-## 📖 What It Does
+Clinical references:
+- [Glasgow Coma Scale official FAQ](https://www.glasgowcomascale.org/faq/) — component scoring and NT rules
+- [NICE NG232: Head injury](https://www.nice.org.uk/guidance/ng232/chapter/recommendations) — document E, V and M separately
 
-Glasgow Coma Scale (GCS) Calculator.
+## Python usage
 
-Implements the standard GCS scoring system (Teasdale & Jennett, 1974) with:
-- Eye Opening (E): 1-4
-- Verbal Response (V): 1-5 (or 1T for intubated patients)
-- Motor Response (M): 1-6
-- Total GCS = E + V + M (range 3-15)
-- GCS-P (GCS-Pupil) score: GCS minus Pupil Reactivity Score
-- Pediatric verbal scale modifications
+The core scorer (`gcs.py`) uses the Python standard library. Python 3.10+ is supported; optional API and test dependencies are in `requirements.txt`.
 
----
-
-## ⚙️ Key Capabilities & Algorithmic Modules
-
-### 🔬 Analytical Functions
-
-- **`parse_verbal_score()`**: Parse a verbal score that may be an int or a string like '1T'.
-
-Returns (numeric_score, is_intubated).
-The 'T' suffix indicates the patient is intubated and verbal response
-cannot be assessed; the numeric part is reported as 1T by convention.
-- **`validate_component()`**: Validate a GCS component score and return its integer value.
-- **`classify_severity()`**: Return severity classification string for a GCS total score.
-- **`calculate_gcs()`**: Calculate Glasgow Coma Scale score.
-
-Parameters
-----------
-eye : int
-    Eye Opening score (1-4).
-verbal : int or str
-    Verbal Response score (1-5). Use '1T' etc. for intubated patients.
-motor : int
-    Motor Response score (1-6).
-intubated : bool
-    If True and verbal is not explicitly 'T'-suffixed, mark as intubated.
-    When intubated, verbal is reported as 1T and excluded from total.
-pediatric : bool
-    If True, use pediatric verbal scale descriptions.
-
-Returns
--------
-dict with keys:
-    eye: int
-    eye_description: str
-    verbal: int
-    verbal_description: str
-    verbal_display: str  (e.g. "3" or "1T")
-    motor: int
-    motor_description: str
-    total: int
-    severity: str
-    is_intubated: bool
-    pediatric: bool
-- **`calculate_gcs_p()`**: Calculate GCS-P (GCS-Pupil) score.
-
-Parameters
-----------
-gcs_total : int
-    Total GCS score (3-15).
-pupil_reactivity_score : int
-    Pupil Reactivity Score (PRS): 0, 1, or 2.
-    0 = Both pupils react
-    1 = One pupil reacts
-    2 = Neither pupil reacts
-
-Returns
--------
-dict with keys:
-    gcs: int
-    prs: int
-    prs_description: str
-    gcs_p: int  (range 1-15)
-
----
-
-## 📐 Mathematical Formulation & Logic
-
-```text
-Total GCS = Eye (E) + Verbal (V) + Motor (M)
-GCS Range: 3 (deep coma) to 15 (normal)
-
-GCS-P = GCS_total - Pupil Reactivity Score (PRS)
-GCS-P Range: 1 to 15
-
-Severity Classification:
-  15      : Normal
-  13-14   : Mild brain injury
-  9-12    : Moderate brain injury
-  3-8     : Severe brain injury (coma)
-```
-
----
-
-## 💻 CLI Quickstart & Usage
-
-### Installation
-```bash
-pip install -r requirements.txt
-```
-
-### 1. Score a Single Patient
 ```bash
 python cli.py score --eye 4 --verbal 5 --motor 6
-python cli.py score --eye 3 --verbal 1T --motor 4 --pupils 1
-python cli.py score --eye 2 --verbal 2 --motor 3 --pediatric --json
+python cli.py score --eye 3 --verbal NT --motor 4
+python cli.py score --eye 2 --verbal 3 --motor 4 --pupils 1 --json
+python cli.py batch --input sample.csv --output scored.csv
 ```
 
-### 2. Batch Process from CSV
-```bash
-python cli.py batch --input patients.csv --output scored.csv
-```
+The CSV schema requires `eye`, `verbal`, and `motor`. Optional columns include `pupils`, `intubated`, `pediatric`, and `patient_id`. The output includes the component notation, severity where classifiable, and GCS-P when available. Invalid rows are indicated with an error instead of silently substituting missing components.
 
-### 3. Run Distributed Component Audit
-```bash
-python cli.py audit --task-id TASK-001 --primary 12.5 --secondary 4.0
-```
+Do not add identifiable patient information to clinical examples or shared output files.
 
-### 4. Query Supervisory Assistant
-```bash
-python cli.py chat "Explain GCS scoring criteria"
-```
-
-### 5. Verify Audit Trail Integrity
-```bash
-python cli.py verify-audit
-```
-
-### 6. Start REST API Server
-```bash
-python cli.py serve --host 0.0.0.0 --port 8000
-```
-
-### Parameter Reference
-- `--eye`: Eye Opening score (1-4)
-- `--verbal`: Verbal Response score (1-5 or 1T for intubated)
-- `--motor`: Motor Response score (1-6)
-- `--pupils`: Pupil Reactivity Score (0-2) for GCS-P
-- `--intubated`: Flag for intubated patients
-- `--pediatric`: Use pediatric verbal scale
-- `--json`: Output result as JSON
-
-### Input Data Schema (CSV)
-
-| Field | Description | Requirement |
-|:------|:------------|:------------|
-| `patient_id` | Patient identifier | Optional |
-| `eye` | Eye Opening score (1-4) | Required |
-| `verbal` | Verbal Response score (1-5 or 1T) | Required |
-| `motor` | Motor Response score (1-6) | Required |
-| `pupils` | Pupil Reactivity Score (0-2) | Optional |
-| `intubated` | Intubated flag (true/false) | Optional |
-| `pediatric` | Pediatric scale flag (true/false) | Optional |
-
----
-
-## 🛡️ Security & Enterprise Architecture
-
-* **Zero-PHI Outbound Interceptor:** Active regex inspection blocking SSNs, MRNs, phone numbers, and patient identifiers.
-* **Tamper-Evident HMAC-SHA256 Audit Trail:** Chained, cryptographically signed logs for every evaluation and state transition.
-* **FastAPI & Prometheus Telemetry:** Exposes OpenAPI 3.1 REST endpoints and operational Prometheus metrics (`/metrics`).
-* **Multi-Agent Supervisory System:** Distributed component workers for QC, safety, and protocol conformance.
-
----
-
-## 🧪 Testing & Verification
-
-Run the automated test suite:
+## Optional server and supervisory tools
 
 ```bash
-pytest -v
+python -m pip install -r requirements.txt
+python cli.py serve --host 127.0.0.1 --port 8000
 ```
 
-Run specific test files:
+The calculator is then available at `http://127.0.0.1:8000/`. The API schema is at `/docs`, health at `/health`, JSON counters at `/metrics`, and the optional backend supervisory audit at `/api/audit`. The advanced audit panel on the web page only works when served from this backend; **the browser-only GitHub Pages application does not run the Python server or supervisory audit**.
+
+Other CLI subcommands are `audit`, `chat`, and `verify-audit`. These operate through an auxiliary mocked supervisory module; they are not part of the clinical GCS scoring algorithm and should not be treated as validated medical decision support.
+
+For audit HMACs, set the `AUDIT_SECRET_KEY` environment variable to a confidential random key in long-lived deployments. Without this setting, an unpredictable session-only key is generated. Audit records are held in process memory, not a durable independent audit log; they should not be used for compliance-grade logging.
+
+## Development and verification
 
 ```bash
-pytest test_gcs.py -v          # Core GCS functionality (102 tests)
-pytest tests/ -v               # Enterprise module tests
+python -m pip install -r requirements.txt
+python -m compileall -q .
+python -m pytest -q
 ```
 
-Execute high-throughput batch simulation benchmarks:
+The CI workflow tests Python 3.10, 3.11 and 3.12 and validates inline browser JavaScript syntax. `web/index.html` requires no npm package installation, Pyodide, or JavaScript build step. A GitHub Actions Pages workflow packages the `web/` directory; publication also requires Pages to be enabled for the repository.
 
-```bash
-python simulator.py 1000
-```
+The app uses standard HTML/CSS/JavaScript and Python with FastAPI/Pydantic for optional server workflows. Browser calculations operate in memory only; they do not use browser storage or transmit clinical selections. The advanced audit panel makes a same-origin request only after its button is pressed.
 
----
+## License
 
-## 🐳 Container Deployment
-
-```bash
-docker build -t gcs-calculator .
-docker run -p 8000:8000 gcs-calculator
-```
-
----
-
-## 📁 Project Structure
-
-```
-gcs-calculator/
-├── gcs.py                 # Core GCS calculator logic and CLI
-├── cli.py                 # CLI entry point
-├── test_gcs.py            # Core functionality tests
-├── enrichment.py          # Clinical enrichment engines
-├── simulator.py           # Simulation benchmark tool
-├── agents/                # Enterprise multi-agent module
-│   ├── api.py             # FastAPI REST server
-│   ├── base.py            # Security, PHI guard, audit trail
-│   ├── models.py          # Pydantic data models
-│   ├── supervisor.py      # Multi-agent orchestrator
-│   ├── workers.py         # Specialized worker agents
-│   ├── llm_factory.py     # LLM provider factory
-│   ├── metrics.py         # Prometheus metrics exporter
-│   ├── streamer.py        # WebSocket telemetry streamer
-│   └── learning.py        # Bayesian calibration engine
-├── tests/                 # Enterprise module tests
-│   ├── test_gcs_calculator.py
-│   └── test_enrichment.py
-├── web/                   # Operations console (HTML)
-├── sample.csv             # Sample patient data
-├── benchmark_dataset.json # Benchmark test cases
-├── Dockerfile             # Container definition
-├── docker-compose.yml     # Docker Compose configuration
-└── requirements.txt       # Python dependencies
-```
+[MIT](LICENSE).
