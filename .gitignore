@@ -26,6 +26,11 @@ build/
 .coverage
 htmlcov/
 
+# Local configuration and secrets
+.env
+.env.*
+!.env.example
+
 # Project specific
 results.csv
 output.csv
