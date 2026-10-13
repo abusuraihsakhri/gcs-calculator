@@ -462,8 +462,8 @@ def build_parser():
         help="Start the FastAPI REST server",
     )
     sv.add_argument(
-        "--host", default="0.0.0.0",
-        help="Host to bind the server to",
+        "--host", default="127.0.0.1",
+        help="Host to bind the server to (localhost by default)",
     )
     sv.add_argument(
         "--port", type=int, default=8000,
