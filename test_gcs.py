@@ -133,7 +133,7 @@ class TestNormalGCS(unittest.TestCase):
     def test_gcs_15(self):
         r = calculate_gcs(4, 5, 6)
         self.assertEqual(r["total"], 15)
-        self.assertEqual(r["severity"], "Normal")
+        self.assertEqual(r["severity"], "Mild TBI score range (13-15)")
 
     def test_gcs_15_components(self):
         r = calculate_gcs(4, 5, 6)
@@ -148,17 +148,17 @@ class TestMildBrainInjury(unittest.TestCase):
     def test_gcs_14(self):
         r = calculate_gcs(4, 4, 6)
         self.assertEqual(r["total"], 14)
-        self.assertEqual(r["severity"], "Mild brain injury")
+        self.assertEqual(r["severity"], "Mild TBI score range (13-15)")
 
     def test_gcs_13(self):
         r = calculate_gcs(4, 4, 5)
         self.assertEqual(r["total"], 13)
-        self.assertEqual(r["severity"], "Mild brain injury")
+        self.assertEqual(r["severity"], "Mild TBI score range (13-15)")
 
     def test_gcs_13_alternate(self):
         r = calculate_gcs(3, 4, 6)
         self.assertEqual(r["total"], 13)
-        self.assertEqual(r["severity"], "Mild brain injury")
+        self.assertEqual(r["severity"], "Mild TBI score range (13-15)")
 
 
 class TestModerateBrainInjury(unittest.TestCase):
@@ -167,17 +167,17 @@ class TestModerateBrainInjury(unittest.TestCase):
     def test_gcs_12(self):
         r = calculate_gcs(3, 4, 5)
         self.assertEqual(r["total"], 12)
-        self.assertEqual(r["severity"], "Moderate brain injury")
+        self.assertEqual(r["severity"], "Moderate TBI score range (9-12)")
 
     def test_gcs_10(self):
         r = calculate_gcs(3, 3, 4)
         self.assertEqual(r["total"], 10)
-        self.assertEqual(r["severity"], "Moderate brain injury")
+        self.assertEqual(r["severity"], "Moderate TBI score range (9-12)")
 
     def test_gcs_9(self):
         r = calculate_gcs(2, 3, 4)
         self.assertEqual(r["total"], 9)
-        self.assertEqual(r["severity"], "Moderate brain injury")
+        self.assertEqual(r["severity"], "Moderate TBI score range (9-12)")
 
 
 class TestSevereBrainInjury(unittest.TestCase):
@@ -186,17 +186,17 @@ class TestSevereBrainInjury(unittest.TestCase):
     def test_gcs_8(self):
         r = calculate_gcs(2, 2, 4)
         self.assertEqual(r["total"], 8)
-        self.assertEqual(r["severity"], "Severe brain injury (coma)")
+        self.assertEqual(r["severity"], "Severe TBI score range (3-8)")
 
     def test_gcs_6(self):
         r = calculate_gcs(1, 2, 3)
         self.assertEqual(r["total"], 6)
-        self.assertEqual(r["severity"], "Severe brain injury (coma)")
+        self.assertEqual(r["severity"], "Severe TBI score range (3-8)")
 
     def test_gcs_3_deep_coma(self):
         r = calculate_gcs(1, 1, 1)
         self.assertEqual(r["total"], 3)
-        self.assertEqual(r["severity"], "Severe brain injury (coma)")
+        self.assertEqual(r["severity"], "Severe TBI score range (3-8)")
 
     def test_gcs_3_components_all_minimum(self):
         r = calculate_gcs(1, 1, 1)
@@ -354,25 +354,25 @@ class TestSeverityClassification(unittest.TestCase):
     """Test severity classification function directly."""
 
     def test_severity_15(self):
-        self.assertEqual(classify_severity(15), "Normal")
+        self.assertEqual(classify_severity(15), "Mild TBI score range (13-15)")
 
     def test_severity_14(self):
-        self.assertEqual(classify_severity(14), "Mild brain injury")
+        self.assertEqual(classify_severity(14), "Mild TBI score range (13-15)")
 
     def test_severity_13(self):
-        self.assertEqual(classify_severity(13), "Mild brain injury")
+        self.assertEqual(classify_severity(13), "Mild TBI score range (13-15)")
 
     def test_severity_12(self):
-        self.assertEqual(classify_severity(12), "Moderate brain injury")
+        self.assertEqual(classify_severity(12), "Moderate TBI score range (9-12)")
 
     def test_severity_9(self):
-        self.assertEqual(classify_severity(9), "Moderate brain injury")
+        self.assertEqual(classify_severity(9), "Moderate TBI score range (9-12)")
 
     def test_severity_8(self):
-        self.assertEqual(classify_severity(8), "Severe brain injury (coma)")
+        self.assertEqual(classify_severity(8), "Severe TBI score range (3-8)")
 
     def test_severity_3(self):
-        self.assertEqual(classify_severity(3), "Severe brain injury (coma)")
+        self.assertEqual(classify_severity(3), "Severe TBI score range (3-8)")
 
 
 class TestInputValidation(unittest.TestCase):
@@ -424,7 +424,7 @@ class TestFormatResult(unittest.TestCase):
         self.assertIn("Verbal (V): 5", output)
         self.assertIn("Motor (M):  6", output)
         self.assertIn("Total GCS:  15", output)
-        self.assertIn("Normal", output)
+        self.assertIn("Mild TBI score range (13-15)", output)
 
     def test_format_with_gcs_p(self):
         r = calculate_gcs(4, 5, 6)
@@ -470,9 +470,9 @@ class TestCSVBatchProcessing(unittest.TestCase):
             results = process_csv(inp, outp)
             self.assertEqual(len(results), 2)
             self.assertEqual(results[0]["gcs_total"], 15)
-            self.assertEqual(results[0]["severity"], "Normal")
+            self.assertEqual(results[0]["severity"], "Mild TBI score range (13-15)")
             self.assertEqual(results[1]["gcs_total"], 3)
-            self.assertEqual(results[1]["severity"], "Severe brain injury (coma)")
+            self.assertEqual(results[1]["severity"], "Severe TBI score range (3-8)")
         finally:
             os.unlink(inp)
             os.unlink(outp)
@@ -557,7 +557,7 @@ class TestCLI(unittest.TestCase):
             sys.stdout = old_stdout
         self.assertEqual(rc, 0)
         self.assertIn("15", output)
-        self.assertIn("Normal", output)
+        self.assertIn("Mild TBI score range (13-15)", output)
 
     def test_cli_score_intubated(self):
         """Test: python cli.py score --eye 3 --verbal 1T --motor 4"""
@@ -586,7 +586,7 @@ class TestCLI(unittest.TestCase):
         self.assertEqual(rc, 0)
         data = json.loads(output)
         self.assertEqual(data["total"], 15)
-        self.assertEqual(data["severity"], "Normal")
+        self.assertEqual(data["severity"], "Mild TBI score range (13-15)")
 
     def test_cli_score_json_intubated_without_total(self):
         """Test JSON output when a component is not testable."""
@@ -720,19 +720,19 @@ class TestClinicalScenarios(unittest.TestCase):
         """Alert patient after minor trauma: GCS 15."""
         r = calculate_gcs(4, 5, 6)
         self.assertEqual(r["total"], 15)
-        self.assertEqual(r["severity"], "Normal")
+        self.assertEqual(r["severity"], "Mild TBI score range (13-15)")
 
     def test_confused_patient(self):
         """Confused patient: E4 V4 M6 = GCS 14."""
         r = calculate_gcs(4, 4, 6)
         self.assertEqual(r["total"], 14)
-        self.assertEqual(r["severity"], "Mild brain injury")
+        self.assertEqual(r["severity"], "Mild TBI score range (13-15)")
 
     def test_severe_tbi_patient(self):
         """Severe TBI: E1 V1 M2 = GCS 4."""
         r = calculate_gcs(1, 1, 2)
         self.assertEqual(r["total"], 4)
-        self.assertEqual(r["severity"], "Severe brain injury (coma)")
+        self.assertEqual(r["severity"], "Severe TBI score range (3-8)")
 
     def test_intubated_icu_patient(self):
         """Intubated ICU patient: E3 V-NT M4 has no valid total."""
@@ -745,7 +745,7 @@ class TestClinicalScenarios(unittest.TestCase):
         """Postictal patient: E2 V2 M4 = GCS 8."""
         r = calculate_gcs(2, 2, 4)
         self.assertEqual(r["total"], 8)
-        self.assertEqual(r["severity"], "Severe brain injury (coma)")
+        self.assertEqual(r["severity"], "Severe TBI score range (3-8)")
 
     def test_decorticate_patient(self):
         """Decorticate posturing: E2 V2 M3 = GCS 7."""
