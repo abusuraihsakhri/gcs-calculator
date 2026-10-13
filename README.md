@@ -38,7 +38,14 @@ python cli.py serve --host 127.0.0.1 --port 8000
 
 The calculator is then available at `http://127.0.0.1:8000/`. The API schema is at `/docs`, health at `/health`, JSON counters at `/metrics`, and the optional backend supervisory audit at `/api/audit`. The advanced audit panel on the web page only works when served from this backend; **the browser-only GitHub Pages application does not run the Python server or supervisory audit**.
 
-Other CLI subcommands are `audit`, `chat`, and `verify-audit`. These operate through an auxiliary mocked supervisory module; they are not part of the clinical GCS scoring algorithm and should not be treated as validated medical decision support.
+Other CLI subcommands are `audit`, `chat`, and `verify-audit`. These operate through an auxiliary mocked supervisory module; they are not part of the clinical GCS scoring algorithm and should not be treated as validated medical decision support. The REST endpoints have **no authentication** and must not be exposed directly to the public internet without an appropriate access-control layer.
+
+Docker Compose runs the backend on localhost by default. Set a private secret in the environment before starting it (see `.env.example`):
+
+```bash
+export AUDIT_SECRET_KEY="$(python -c 'import secrets; print(secrets.token_hex(32))')"
+docker compose up --build
+```
 
 For audit HMACs, set the `AUDIT_SECRET_KEY` environment variable to a confidential random key in long-lived deployments. Without this setting, an unpredictable session-only key is generated. Audit records are held in process memory, not a durable independent audit log; they should not be used for compliance-grade logging.
 
