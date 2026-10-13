@@ -436,7 +436,7 @@ class TestFormatResult(unittest.TestCase):
     def test_format_intubated(self):
         r = calculate_gcs(3, "1T", 4)
         output = format_result(r)
-        self.assertIn("1T", output)
+        self.assertIn("NT", output)
         self.assertIn("intubated", output.lower())
 
     def test_format_pediatric(self):
