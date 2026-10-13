@@ -274,6 +274,8 @@ def process_csv(input_path, output_path):
         if not required.issubset({k.strip().lower() for k in fieldnames}):
             raise ValueError("CSV requires eye, verbal, and motor columns.")
         rows = list(reader)
+        if any(None in row for row in rows):
+            raise ValueError("CSV row contains more fields than the header.")
 
     # Build output fieldnames
     extra_fields = ["gcs_total", "severity", "verbal_display"]
@@ -328,10 +330,18 @@ def process_csv(input_path, output_path):
 
         out_rows.append(merged)
 
+    # Prevent spreadsheet formula execution when users open the CSV in Excel
+    # or similar applications. Keep the returned Python row data unchanged.
+    def safe_csv_value(value):
+        if isinstance(value, str) and value.lstrip().startswith(("=", "+", "-", "@")):
+            return "'" + value
+        return value
+
     with open(output_path, "w", newline="", encoding="utf-8") as f:
         writer = csv.DictWriter(f, fieldnames=out_fieldnames)
         writer.writeheader()
-        writer.writerows(out_rows)
+        for row in out_rows:
+            writer.writerow({key: safe_csv_value(value) for key, value in row.items()})
 
     return out_rows
 
