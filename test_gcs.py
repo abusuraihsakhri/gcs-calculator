@@ -759,8 +759,8 @@ class TestClinicalScenarios(unittest.TestCase):
         self.assertEqual(r["total"], 4)
         self.assertEqual(r["motor_description"], "Extension (decerebrate)")
 
-    def test_brain_death_scenario(self):
-        """Brain death: GCS 3, no pupil response, GCS-P = 1."""
+    def test_unresponsive_with_nonreactive_pupils(self):
+        """GCS 3 with nonreactive pupils gives GCS-P 1; not brain-death diagnosis."""
         r = calculate_gcs(1, 1, 1)
         gcs_p = calculate_gcs_p(r["total"], 2)
         self.assertEqual(r["total"], 3)
