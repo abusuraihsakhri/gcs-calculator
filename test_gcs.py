@@ -207,38 +207,38 @@ class TestSevereBrainInjury(unittest.TestCase):
 
 
 class TestIntubatedPatient(unittest.TestCase):
-    """Test intubated patient handling (verbal = 1T)."""
+    """Test intubated patient handling (verbal not testable)."""
 
     def test_intubated_verbal_1t(self):
         r = calculate_gcs(3, "1T", 4)
-        self.assertEqual(r["verbal"], 1)
-        self.assertEqual(r["verbal_display"], "1T")
+        self.assertIsNone(r["verbal"])
+        self.assertEqual(r["verbal_display"], "NT")
         self.assertTrue(r["is_intubated"])
-        self.assertEqual(r["total"], 8)  # 3 + 1 + 4
+        self.assertIsNone(r["total"])
 
     def test_intubated_verbal_1t_string(self):
         r = calculate_gcs(4, "1T", 6)
-        self.assertEqual(r["verbal"], 1)
-        self.assertEqual(r["verbal_display"], "1T")
+        self.assertIsNone(r["verbal"])
+        self.assertEqual(r["verbal_display"], "NT")
         self.assertTrue(r["is_intubated"])
-        self.assertEqual(r["total"], 11)  # 4 + 1 + 6
+        self.assertIsNone(r["total"])
 
     def test_intubated_flag_sets_intubated(self):
-        """When --intubated flag is set, verbal is reported as 1T."""
+        """When --intubated flag is set, verbal is reported as NT."""
         r = calculate_gcs(3, 1, 4, intubated=True)
         self.assertTrue(r["is_intubated"])
-        self.assertEqual(r["verbal_display"], "1T")
+        self.assertEqual(r["verbal_display"], "NT")
 
     def test_intubated_format_output(self):
         r = calculate_gcs(3, "1T", 4)
         output = format_result(r)
-        self.assertIn("1T", output)
+        self.assertIn("NT", output)
         self.assertIn("intubated", output.lower())
 
     def test_intubated_with_gcs_p(self):
         r = calculate_gcs(3, "1T", 4)
-        gcs_p = calculate_gcs_p(r["total"], 1)
-        self.assertEqual(gcs_p["gcs_p"], 7)  # 8 - 1
+        with self.assertRaises(ValueError):
+            calculate_gcs_p(r["total"], 1)
 
     def test_parse_verbal_score_1t(self):
         v, intubated = parse_verbal_score("1T")
@@ -504,8 +504,8 @@ class TestCSVBatchProcessing(unittest.TestCase):
         os.close(fd)
         try:
             results = process_csv(inp, outp)
-            self.assertEqual(results[0]["gcs_total"], 8)
-            self.assertEqual(results[0]["verbal_display"], "1T")
+            self.assertEqual(results[0]["gcs_total"], "")
+            self.assertEqual(results[0]["verbal_display"], "NT")
         finally:
             os.unlink(inp)
             os.unlink(outp)
@@ -560,18 +560,18 @@ class TestCLI(unittest.TestCase):
         self.assertIn("Normal", output)
 
     def test_cli_score_intubated(self):
-        """Test: python cli.py score --eye 3 --verbal 1T --motor 4 --pupils 1"""
+        """Test: python cli.py score --eye 3 --verbal 1T --motor 4"""
         from io import StringIO
         old_stdout = sys.stdout
         sys.stdout = StringIO()
         try:
-            rc = cli_main(["score", "--eye", "3", "--verbal", "1T", "--motor", "4", "--pupils", "1"])
+            rc = cli_main(["score", "--eye", "3", "--verbal", "1T", "--motor", "4"])
             output = sys.stdout.getvalue()
         finally:
             sys.stdout = old_stdout
         self.assertEqual(rc, 0)
-        self.assertIn("1T", output)
-        self.assertIn("GCS-P", output)
+        self.assertIn("NT", output)
+        self.assertIn("Not available", output)
 
     def test_cli_score_json(self):
         """Test JSON output mode."""
@@ -588,21 +588,21 @@ class TestCLI(unittest.TestCase):
         self.assertEqual(data["total"], 15)
         self.assertEqual(data["severity"], "Normal")
 
-    def test_cli_score_json_intubated_with_gcs_p(self):
-        """Test JSON output with intubated patient and GCS-P."""
+    def test_cli_score_json_intubated_without_total(self):
+        """Test JSON output when a component is not testable."""
         from io import StringIO
         old_stdout = sys.stdout
         sys.stdout = StringIO()
         try:
-            rc = cli_main(["score", "--eye", "3", "--verbal", "1T", "--motor", "4", "--pupils", "1", "--json"])
+            rc = cli_main(["score", "--eye", "3", "--verbal", "1T", "--motor", "4", "--json"])
             output = sys.stdout.getvalue()
         finally:
             sys.stdout = old_stdout
         self.assertEqual(rc, 0)
         data = json.loads(output)
-        self.assertEqual(data["total"], 8)
+        self.assertIsNone(data["total"])
         self.assertTrue(data["is_intubated"])
-        self.assertEqual(data["gcs_p"], 7)
+        self.assertNotIn("gcs_p", data)
 
     def test_cli_score_invalid(self):
         """Test CLI with invalid input returns error."""
@@ -735,11 +735,11 @@ class TestClinicalScenarios(unittest.TestCase):
         self.assertEqual(r["severity"], "Severe brain injury (coma)")
 
     def test_intubated_icu_patient(self):
-        """Intubated ICU patient: E3 V1T M4 = GCS 8."""
+        """Intubated ICU patient: E3 V-NT M4 has no valid total."""
         r = calculate_gcs(3, "1T", 4)
-        self.assertEqual(r["total"], 8)
+        self.assertIsNone(r["total"])
         self.assertTrue(r["is_intubated"])
-        self.assertEqual(r["severity"], "Severe brain injury (coma)")
+        self.assertIsNone(r["severity"])
 
     def test_postictal_patient(self):
         """Postictal patient: E2 V2 M4 = GCS 8."""
