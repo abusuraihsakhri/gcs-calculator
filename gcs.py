@@ -57,10 +57,9 @@ PEDIATRIC_VERBAL_SCORES = {
 
 # Severity classification thresholds
 SEVERITY_MAP = [
-    (15, "Normal"),
-    (13, "Mild brain injury"),
-    (9, "Moderate brain injury"),
-    (3, "Severe brain injury (coma)"),
+    (13, "Mild TBI score range (13-15)"),
+    (9, "Moderate TBI score range (9-12)"),
+    (3, "Severe TBI score range (3-8)"),
 ]
 
 # Pupil Reactivity Score labels
@@ -117,11 +116,13 @@ def validate_component(name, value, valid_scores):
 
 
 def classify_severity(gcs_total):
-    """Return severity classification string for a GCS total score."""
+    """Return a TBI-associated score range, not a clinical diagnosis."""
+    if isinstance(gcs_total, bool) or not isinstance(gcs_total, int) or not 3 <= gcs_total <= 15:
+        raise ValueError("GCS total must be an integer from 3 to 15.")
     for threshold, label in SEVERITY_MAP:
         if gcs_total >= threshold:
             return label
-    return "Deep coma/dead"
+    raise AssertionError("Unreachable GCS severity range")
 
 
 def calculate_gcs(eye, verbal, motor, intubated=False, pediatric=False):
@@ -314,11 +315,10 @@ def process_csv(input_path, output_path):
             merged["verbal_display"] = result["verbal_display"]
 
             if has_pupils_col and pupils_val is not None and str(pupils_val).strip():
-                if result["total"] is None:
-                    raise ValueError("GCS-P is unavailable when verbal response is not testable.")
-                gcs_p = calculate_gcs_p(result["total"], pupils_val)
-                merged["gcs_p"] = gcs_p["gcs_p"]
-                merged["prs_description"] = gcs_p["prs_description"]
+                if result["total"] is not None:
+                    gcs_p = calculate_gcs_p(result["total"], pupils_val)
+                    merged["gcs_p"] = gcs_p["gcs_p"]
+                    merged["prs_description"] = gcs_p["prs_description"]
 
         except ValueError as e:
             merged = dict(row)
