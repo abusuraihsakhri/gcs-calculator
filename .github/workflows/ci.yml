@@ -45,11 +45,11 @@ jobs:
     - name: Browser interaction smoke test
       run: node tests/browser-smoke.cjs
 
-    - name: Security SAST & Zero-PHI Audit
+    - name: Audit integrity smoke check
       run: |
         python -c "
         from agents.base import PHIGuard, AuditLogger
         import pytest
         assert AuditLogger.verify_integrity() is True
-        print('Security & Zero-PHI Audit Passed!')
+        print('Audit integrity smoke check passed')
         "
