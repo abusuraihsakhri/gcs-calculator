@@ -1,8 +1,6 @@
 """Clinical and security regression tests for the GCS calculator."""
 
 import csv
-import io
-
 import pytest
 
 from agents.base import AuditTrail
@@ -61,7 +59,7 @@ def test_csv_intubated_no_total_and_blank_pupils(tmp_path):
     source, output = tmp_path / "input.csv", tmp_path / "output.csv"
     source.write_text(
         "eye,verbal,motor,intubated,pupils\n"
-        "3,1T,4,true,\n"
+        "3,1T,4,true,2\n"
         "4,5,6,false,0\n",
         encoding="utf-8",
     )
@@ -87,3 +85,23 @@ def test_audit_integrity_checks_signature_not_only_chain():
     assert trail.verify_integrity()
     entry["current_hash"] = "0" * 64
     assert not trail.verify_integrity()
+
+
+def test_csv_escapes_spreadsheet_formulas(tmp_path):
+    source, output = tmp_path / "input.csv", tmp_path / "output.csv"
+    source.write_text(
+        "patient_id,eye,verbal,motor\n"
+        "=HYPERLINK(1),4,5,6\n", encoding="utf-8"
+    )
+    rows = process_csv(source, output)
+    assert rows[0]["patient_id"] == "=HYPERLINK(1)"
+    with output.open(newline="", encoding="utf-8") as file:
+        exported = list(csv.DictReader(file))
+    assert exported[0]["patient_id"].startswith("'=")
+
+
+def test_csv_rejects_extra_fields(tmp_path):
+    source = tmp_path / "input.csv"
+    source.write_text("eye,verbal,motor\n4,5,6,7\n", encoding="utf-8")
+    with pytest.raises(ValueError, match="more fields"):
+        process_csv(source, tmp_path / "output.csv")
