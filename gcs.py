@@ -57,10 +57,9 @@ PEDIATRIC_VERBAL_SCORES = {
 
 # Severity classification thresholds
 SEVERITY_MAP = [
-    (15, "Normal"),
-    (13, "Mild brain injury"),
-    (9, "Moderate brain injury"),
-    (3, "Severe brain injury (coma)"),
+    (13, "Mild TBI score range (13-15)"),
+    (9, "Moderate TBI score range (9-12)"),
+    (3, "Severe TBI score range (3-8)"),
 ]
 
 # Pupil Reactivity Score labels
@@ -83,6 +82,8 @@ def parse_verbal_score(value):
     cannot be assessed; the numeric part is reported as 1T by convention.
     """
     s = str(value).strip().upper()
+    if s == "NT":
+        return None, True
     is_intubated = False
     if s.endswith("T"):
         is_intubated = True
@@ -99,10 +100,12 @@ def parse_verbal_score(value):
 
 def validate_component(name, value, valid_scores):
     """Validate a GCS component score and return its integer value."""
-    try:
-        num = int(value)
-    except (ValueError, TypeError):
+    if isinstance(value, bool) or not (
+        isinstance(value, int) or
+        (isinstance(value, str) and value.strip().isascii() and value.strip().isdigit())
+    ):
         raise ValueError(f"Invalid {name} score: '{value}'. Must be an integer.")
+    num = int(value)
     if num not in valid_scores:
         low = min(valid_scores)
         high = max(valid_scores)
@@ -113,11 +116,13 @@ def validate_component(name, value, valid_scores):
 
 
 def classify_severity(gcs_total):
-    """Return severity classification string for a GCS total score."""
+    """Return a TBI-associated score range, not a clinical diagnosis."""
+    if isinstance(gcs_total, bool) or not isinstance(gcs_total, int) or not 3 <= gcs_total <= 15:
+        raise ValueError("GCS total must be an integer from 3 to 15.")
     for threshold, label in SEVERITY_MAP:
         if gcs_total >= threshold:
             return label
-    return "Deep coma/dead"
+    raise AssertionError("Unreachable GCS severity range")
 
 
 def calculate_gcs(eye, verbal, motor, intubated=False, pediatric=False):
@@ -133,7 +138,7 @@ def calculate_gcs(eye, verbal, motor, intubated=False, pediatric=False):
         Motor Response score (1-6).
     intubated : bool
         If True and verbal is not explicitly 'T'-suffixed, mark as intubated.
-        When intubated, verbal is reported as 1T and excluded from total.
+        When intubated, verbal is not testable (NT); no total is reported.
     pediatric : bool
         If True, use pediatric verbal scale descriptions.
 
@@ -142,12 +147,12 @@ def calculate_gcs(eye, verbal, motor, intubated=False, pediatric=False):
     dict with keys:
         eye: int
         eye_description: str
-        verbal: int
+        verbal: int or None (not testable)
         verbal_description: str
         verbal_display: str  (e.g. "3" or "1T")
         motor: int
         motor_description: str
-        total: int
+        total: int or None
         severity: str
         is_intubated: bool
         pediatric: bool
@@ -160,33 +165,28 @@ def calculate_gcs(eye, verbal, motor, intubated=False, pediatric=False):
     v, verbal_intubated = parse_verbal_score(verbal)
     is_intubated = intubated or verbal_intubated
 
-    if v not in VERBAL_SCORES:
+    if v is not None and v not in VERBAL_SCORES:
         raise ValueError(
             f"Invalid verbal score: {v}. Must be between 1 and 5."
         )
 
-    # For intubated patients, verbal cannot be assessed.
-    # Convention: report as 1T, exclude verbal from total (use 1).
-    verbal_display = str(v)
-    if is_intubated:
-        verbal_display = f"{v}T"
-
-    # Select verbal description set
+    # An untestable verbal component must not be imputed as 1.
+    # Retain E and M, but withhold the total, severity and GCS-P.
     verbal_desc_map = PEDIATRIC_VERBAL_SCORES if pediatric else VERBAL_SCORES
-
-    # Total GCS
-    total = e + v + m
+    verbal_display = "NT" if is_intubated else str(v)
+    verbal_description = "Not testable (intubated)" if is_intubated else verbal_desc_map[v]
+    total = None if is_intubated else e + v + m
 
     return {
         "eye": e,
         "eye_description": EYE_SCORES[e],
-        "verbal": v,
-        "verbal_description": verbal_desc_map[v],
+        "verbal": None if is_intubated else v,
+        "verbal_description": verbal_description,
         "verbal_display": verbal_display,
         "motor": m,
         "motor_description": MOTOR_SCORES[m],
         "total": total,
-        "severity": classify_severity(total),
+        "severity": None if total is None else classify_severity(total),
         "is_intubated": is_intubated,
         "pediatric": pediatric,
     }
@@ -213,8 +213,16 @@ def calculate_gcs_p(gcs_total, pupil_reactivity_score):
         prs_description: str
         gcs_p: int  (range 1-15)
     """
-    if not (3 <= gcs_total <= 15):
-        raise ValueError(f"GCS total must be 3-15, got {gcs_total}.")
+    if (isinstance(gcs_total, bool) or not isinstance(gcs_total, int)
+            or not 3 <= gcs_total <= 15):
+        raise ValueError(f"GCS total must be an integer from 3 to 15, got {gcs_total}.")
+    if isinstance(pupil_reactivity_score, bool) or not (
+        isinstance(pupil_reactivity_score, int) or
+        (isinstance(pupil_reactivity_score, str)
+         and pupil_reactivity_score.strip().isascii()
+         and pupil_reactivity_score.strip().isdigit())
+    ):
+        raise ValueError("PRS must be an integer from 0 to 2.")
     prs = int(pupil_reactivity_score)
     if prs not in PRS_LABELS:
         raise ValueError(f"PRS must be 0, 1, or 2. Got {prs}.")
@@ -236,10 +244,10 @@ def format_result(result, gcs_p_result=None):
     lines.append(f"Eye (E):    {result['eye']} - {result['eye_description']}")
     lines.append(f"Verbal (V): {result['verbal_display']} - {result['verbal_description']}")
     lines.append(f"Motor (M):  {result['motor']} - {result['motor_description']}")
-    lines.append(f"Total GCS:  {result['total']}")
-    lines.append(f"Severity:   {result['severity']}")
+    lines.append(f"Total GCS:  {result['total'] if result['total'] is not None else 'Not available (V-NT)'}")
+    lines.append(f"Severity:   {result['severity'] if result['severity'] is not None else 'Not classifiable'}")
     if result["is_intubated"]:
-        lines.append("Note:       Patient is intubated (verbal score cannot be fully assessed)")
+        lines.append("Note:       Verbal response is not testable; no valid total GCS or GCS-P.")
     if result["pediatric"]:
         lines.append("Scale:      Pediatric verbal scale")
     if gcs_p_result:
@@ -262,25 +270,29 @@ def process_csv(input_path, output_path):
     with open(input_path, newline="", encoding="utf-8-sig") as f:
         reader = csv.DictReader(f)
         fieldnames = list(reader.fieldnames or [])
+        required = {"eye", "verbal", "motor"}
+        if not required.issubset({k.strip().lower() for k in fieldnames}):
+            raise ValueError("CSV requires eye, verbal, and motor columns.")
         rows = list(reader)
+        if any(None in row for row in rows):
+            raise ValueError("CSV row contains more fields than the header.")
 
     # Build output fieldnames
     extra_fields = ["gcs_total", "severity", "verbal_display"]
     # Check if any row has a 'pupils' column
-    sample_keys = set(rows[0].keys()) if rows else set()
-    has_pupils_col = any(k.lower() == "pupils" for k in sample_keys)
+    has_pupils_col = any(k.strip().lower() == "pupils" for k in fieldnames)
 
     if has_pupils_col:
         extra_fields.extend(["gcs_p", "prs_description"])
 
-    out_fieldnames = fieldnames + extra_fields
+    out_fieldnames = fieldnames + [name for name in extra_fields if name not in fieldnames]
     out_rows = []
 
     for row in rows:
         # Extract values with flexible column name matching
         def get_val(key, default=None):
             for k, v in row.items():
-                if k.lower() == key.lower():
+                if k is not None and k.strip().lower() == key.lower():
                     return v
             return default
 
@@ -300,14 +312,15 @@ def process_csv(input_path, output_path):
                 pediatric=pediatric_val,
             )
             merged = dict(row)
-            merged["gcs_total"] = result["total"]
-            merged["severity"] = result["severity"]
+            merged["gcs_total"] = result["total"] if result["total"] is not None else ""
+            merged["severity"] = result["severity"] or "Not classifiable (V-NT)"
             merged["verbal_display"] = result["verbal_display"]
 
-            if has_pupils_col and pupils_val is not None:
-                gcs_p = calculate_gcs_p(result["total"], pupils_val)
-                merged["gcs_p"] = gcs_p["gcs_p"]
-                merged["prs_description"] = gcs_p["prs_description"]
+            if has_pupils_col and pupils_val is not None and str(pupils_val).strip():
+                if result["total"] is not None:
+                    gcs_p = calculate_gcs_p(result["total"], pupils_val)
+                    merged["gcs_p"] = gcs_p["gcs_p"]
+                    merged["prs_description"] = gcs_p["prs_description"]
 
         except ValueError as e:
             merged = dict(row)
@@ -317,10 +330,18 @@ def process_csv(input_path, output_path):
 
         out_rows.append(merged)
 
+    # Prevent spreadsheet formula execution when users open the CSV in Excel
+    # or similar applications. Keep the returned Python row data unchanged.
+    def safe_csv_value(value):
+        if isinstance(value, str) and value.lstrip().startswith(("=", "+", "-", "@")):
+            return "'" + value
+        return value
+
     with open(output_path, "w", newline="", encoding="utf-8") as f:
         writer = csv.DictWriter(f, fieldnames=out_fieldnames)
         writer.writeheader()
-        writer.writerows(out_rows)
+        for row in out_rows:
+            writer.writerow({key: safe_csv_value(value) for key, value in row.items()})
 
     return out_rows
 
@@ -348,7 +369,7 @@ def build_parser():
     )
     s.add_argument(
         "--verbal", "-v", type=str, required=True,
-        help="Verbal Response score (1-5 or 1T for intubated): "
+        help="Verbal Response score (1-5; NT or legacy 1T if intubated): "
              "5=Oriented, 4=Confused, 3=Inappropriate words, 2=Incomprehensible, 1=None",
     )
     s.add_argument(
@@ -363,7 +384,7 @@ def build_parser():
     )
     s.add_argument(
         "--intubated", action="store_true",
-        help="Patient is intubated (verbal score reported as 1T)",
+        help="Patient is intubated (verbal response NT; no total GCS)",
     )
     s.add_argument(
         "--pediatric", action="store_true",
@@ -441,8 +462,8 @@ def build_parser():
         help="Start the FastAPI REST server",
     )
     sv.add_argument(
-        "--host", default="0.0.0.0",
-        help="Host to bind the server to",
+        "--host", default="127.0.0.1",
+        help="Host to bind the server to (localhost by default)",
     )
     sv.add_argument(
         "--port", type=int, default=8000,
@@ -472,6 +493,9 @@ def main(argv=None):
 
         gcs_p_result = None
         if a.pupils is not None:
+            if result["total"] is None:
+                print("Error: GCS-P cannot be calculated with a not-testable verbal response.", file=sys.stderr)
+                return 1
             try:
                 gcs_p_result = calculate_gcs_p(result["total"], a.pupils)
             except ValueError as e:

@@ -1,8 +1,8 @@
 {
   "openapi": "3.1.0",
   "info": {
-    "title": "Gcs Calculator API",
-    "description": "Enterprise Distributed Component Platform (Clinical & Cryptographic AI) adhering to CAP / CLSI / NIST Standards.",
+    "title": "GCS Calculator: optional backend audit API",
+    "description": "Auxiliary, unauthenticated mock supervisory audit API. Clinical GCS scoring runs in gcs.py and the standalone browser interface; this API does not provide a clinical GCS scoring endpoint.",
     "version": "3.0.0-ENTERPRISE",
     "contact": {
       "name": "Dr. Abu Suraih Sakhri",
@@ -15,17 +15,17 @@
         "summary": "Health and metadata check",
         "responses": {
           "200": {
-            "description": "System optimal"
+            "description": "Service health metadata"
           }
         }
       }
     },
     "/metrics": {
       "get": {
-        "summary": "Prometheus operational metrics",
+        "summary": "JSON in-memory operational counters",
         "responses": {
           "200": {
-            "description": "Prometheus text metrics"
+            "description": "JSON object containing in-memory counters"
           }
         }
       }
@@ -76,7 +76,7 @@
     },
     "/api/chat": {
       "post": {
-        "summary": "Air-gapped supervisory conversational assistant",
+        "summary": "Deterministic mock supervisory response (not clinical verification)",
         "requestBody": {
           "content": {
             "application/json": {
@@ -103,7 +103,7 @@
     },
     "/api/audit/logs": {
       "get": {
-        "summary": "Retrieve and cryptographically verify HMAC audit trail",
+        "summary": "Retrieve and verify the in-memory HMAC audit chain",
         "responses": {
           "200": {
             "description": "Cryptographic audit trail"
